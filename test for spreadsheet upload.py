@@ -1,0 +1,46 @@
+import os
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
+scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+
+###################### 上传到哪个spreadsheet ######################
+spreadsheet_id = "107USFlV8tVtCab9S0dT97tystc1Js2shVPEGbKjE3vY"
+
+##测试直接把data上传到spreadsheet
+def main():
+    credentials = None
+    if os.path.exists('token.json'):
+        credentials = Credentials.from_authorized_user_file("token.json", scopes)
+    if not credentials or not credentials.valid:
+        if credentials and credentials.expired and credentials.refresh_token:
+            credentials.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file("crudentials_sheets.json", scopes)
+            credentials = flow.run_local_server(port=0)
+        with open("token.json", "w") as token:
+            token.write(credentials.to_json())
+    try:
+        service = build("sheets", "v4", credentials = credentials)
+        sheets = service.spreadsheets()
+
+        for row in range(2,7):
+            num1 = int(sheets.values().get(spreadsheetId=spreadsheet_id, range=f"test!A{row}").execute().get("values")[0][0])
+            num2 = int(sheets.values().get(spreadsheetId=spreadsheet_id, range=f"test!B{row}").execute().get("values")[0][0])
+            calculation_result = num1+num2
+            print(f"Processing {num1}+{num2}")
+
+            sheets.values().update(spreadsheetId=spreadsheet_id, range=f"test!C{row}", #test是工作表，要改
+                                   valueInputOption="USER_ENTERED", body = {"values": [[f"{calculation_result}"]]}).execute()
+            sheets.values().update(spreadsheetId=spreadsheet_id, range=f"test!D{row}", #test是工作表，要改
+                                   valueInputOption="USER_ENTERED", body = {"values": [["Done"]]}).execute()
+
+    except HttpError as error:
+        print(error)
+
+if __name__ == "__main__":
+    main()
+
